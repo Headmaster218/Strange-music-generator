@@ -1,6 +1,8 @@
 import os
 from pynput import keyboard
+import sys
 from moviepy.editor import VideoFileClip, concatenate_videoclips  # 更正导入路径
+from getpass import getpass  # 新增导入
 
 key_sequence = []
 negative_flag = False
@@ -31,6 +33,8 @@ def on_press(key):
                 removed = key_sequence.pop()
                 print(f"删除: {removed}")  # 打印删除的输入
         elif key == keyboard.Key.enter:
+            # 清空缓冲区
+            negative_flag = False
             return False  # 结束监听
     return True
 
@@ -42,10 +46,40 @@ def main():
         listener.join()
 
     print(f"\n录入顺序：{key_sequence}\n")
+    getpass("\n")
 
     video_clips = []
+    material_path = "./material"
+    if not os.path.exists(material_path):
+        print("❌ 未找到 material 文件夹，退出。")
+        return
+
+    # 获取 material 文件夹中的所有子文件夹
+    subfolders = [f for f in os.listdir(material_path) if os.path.isdir(os.path.join(material_path, f))]
+    if not subfolders:
+        print("❌ material 文件夹中没有任何素材，退出。")
+        return
+
+    print("可用素材列表：")
+    for idx, folder in enumerate(subfolders, start=1):
+        print(f"{idx}. {folder}")
+
+    # 让用户选择素材文件夹
+    try:
+        choice = int(input("请选择素材文件夹编号：")) - 1  # 使用 getpass 替代 input
+        if choice < 0 or choice >= len(subfolders):
+            print("❌ 无效的选择，退出。")
+            return
+        selected_folder = subfolders[choice]
+    except ValueError:
+        print("❌ 输入无效，退出。")
+        return
+
+    selected_path = os.path.join(material_path, selected_folder)
+    print(f"已选择素材文件夹：{selected_folder}")
+
     for num in key_sequence:
-        video_path = f"./{num}.mp4"
+        video_path = os.path.join(selected_path, f"{num}.mp4")
         if os.path.exists(video_path):
             try:
                 clip = VideoFileClip(video_path)
@@ -54,7 +88,7 @@ def main():
                 print(f"⚠️ 加载视频 {video_path} 出错：{e}")
         else:
             # 如果没有找到对应视频，尝试使用相反数的名称
-            alt_video_path = f"./{-num}.mp4"
+            alt_video_path = os.path.join(selected_path, f"{-num}.mp4")
             if os.path.exists(alt_video_path):
                 try:
                     clip = VideoFileClip(alt_video_path)
