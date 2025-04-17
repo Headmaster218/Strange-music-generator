@@ -38,6 +38,26 @@ def on_press(key):
             return False  # 结束监听
     return True
 
+def batch_concatenate_videos(video_clips, batch_size=5):
+    """分批合成视频"""
+    batches = [video_clips[i:i + batch_size] for i in range(0, len(video_clips), batch_size)]
+    temp_clips = []
+    temp_paths = []  # 用于存储临时文件路径
+
+    for idx, batch in enumerate(batches):
+        print(f"正在合成第 {idx + 1} 批视频...")
+        try:
+            temp_clip = concatenate_videoclips(batch)
+            temp_path = f"temp_batch_{idx + 1}.mp4"
+            temp_clip.write_videofile(temp_path, codec="libx264")
+            temp_clips.append(VideoFileClip(temp_path))
+            temp_paths.append(temp_path)
+        finally:
+            for clip in batch:
+                clip.close()
+
+    return temp_clips, temp_paths
+
 def main():
     print("请输入数字（支持负号），按 Enter 结束：")
 
@@ -100,13 +120,21 @@ def main():
 
     if video_clips:
         try:
-            final_clip = concatenate_videoclips(video_clips)
+            # 分批合成视频
+            temp_clips, temp_paths = batch_concatenate_videos(video_clips, batch_size=10)
+            print("正在合成最终视频...")
+            final_clip = concatenate_videoclips(temp_clips)
             output_path = "output.mp4"
             final_clip.write_videofile(output_path, codec="libx264")
             print(f"✅ 合成成功，保存到：{output_path}")
         finally:
-            for clip in video_clips:
+            for clip in temp_clips:
                 clip.close()
+            # 删除临时文件
+            for temp_path in temp_paths:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    print(f"🗑️ 已删除临时文件：{temp_path}")
     else:
         print("❌ 未能找到任何有效的视频，退出。")
 
