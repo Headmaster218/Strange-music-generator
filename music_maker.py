@@ -3,6 +3,7 @@ from pynput import keyboard
 import sys
 from moviepy.editor import VideoFileClip, concatenate_videoclips  # 更正导入路径
 from getpass import getpass  # 新增导入
+from tkinter import Tk, filedialog  # 新增导入
 
 key_sequence = []
 negative_flag = False
@@ -38,6 +39,44 @@ def on_press(key):
             return False  # 结束监听
     return True
 
+import re
+
+def load_sequence_from_file(file_path):
+    """从文本文件加载数字顺序，支持逗号、空格、换行混合分隔，自动忽略非法内容"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+
+            # 使用正则提取所有合法的整数（支持负号）
+            number_strs = re.findall(r'-?\d+', content)
+            sequence = [int(num) for num in number_strs]
+
+            print(f"✅ 从文件加载顺序成功：{sequence}")
+            return sequence
+    except FileNotFoundError:
+        print(f"❌ 文件未找到：{file_path}")
+    except Exception as e:
+        print(f"❌ 无法从文件加载顺序：{e}")
+    return []
+
+
+def select_file_via_dialog(starting_path="."):
+    """通过文件选择对话框选择文件"""
+    try:
+        root = Tk()
+        root.withdraw()  # 隐藏主窗口
+        root.attributes('-topmost', True)  # 窗口置顶
+        file_path = filedialog.askopenfilename(
+            initialdir=starting_path, 
+            title="选择文本文件", 
+            filetypes=[("文本文件", "*.txt")]
+        )
+        root.destroy()
+        return file_path
+    except Exception as e:
+        print(f"❌ 文件选择出错：{e}")
+        return None
+
 def batch_concatenate_videos(video_clips, batch_size=5):
     """分批合成视频"""
     batches = [video_clips[i:i + batch_size] for i in range(0, len(video_clips), batch_size)]
@@ -59,14 +98,34 @@ def batch_concatenate_videos(video_clips, batch_size=5):
     return temp_clips, temp_paths
 
 def main():
-    print("请输入数字（支持负号），按 Enter 结束：")
-
-    # 开始监听键盘
-    with keyboard.Listener(on_press=on_press) as listener:
-        listener.join()
+    print("请选择输入方式：")
+    print("1. 手动输入")
+    print("2. 从文本文件加载顺序")
+    try:
+        input_choice = int(input("请输入选项编号（1 或 2）："))
+        if input_choice == 1:
+            print("请输入数字（支持负号），按 Enter 结束：")
+            # 开始监听键盘
+            with keyboard.Listener(on_press=on_press) as listener:
+                listener.join()
+            getpass("\n")
+        elif input_choice == 2:
+            print("请通过文件选择对话框选择文本文件...")
+            file_path = select_file_via_dialog()
+            if file_path and os.path.exists(file_path):
+                global key_sequence
+                key_sequence = load_sequence_from_file(file_path)
+            else:
+                print("❌ 文件不存在或未选择文件，退出。")
+                return
+        else:
+            print("❌ 无效的选项，退出。")
+            return
+    except ValueError:
+        print("❌ 输入无效，退出。")
+        return
 
     print(f"\n录入顺序：{key_sequence}\n")
-    getpass("\n")
 
     video_clips = []
     material_path = "./material"
@@ -86,7 +145,7 @@ def main():
 
     # 让用户选择素材文件夹
     try:
-        choice = int(input("请选择素材文件夹编号：")) - 1  # 使用 getpass 替代 input
+        choice = int(input("请选择素材文件夹编号：")) - 1
         if choice < 0 or choice >= len(subfolders):
             print("❌ 无效的选择，退出。")
             return
