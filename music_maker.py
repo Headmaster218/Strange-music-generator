@@ -72,6 +72,7 @@ def main():
     print("请选择输入方式：")
     print("1. 手动输入")
     print("2. 从文本文件加载顺序")
+    output_filename = "output.mp4"  # 默认输出文件名
     try:
         input_choice = int(input("请输入选项编号（1 或 2）："))
         if input_choice == 1:
@@ -85,6 +86,8 @@ def main():
             if file_path and os.path.exists(file_path):
                 global key_sequence
                 key_sequence = load_sequence_from_file(file_path)
+                # 使用文本文件的名称作为输出文件名
+                output_filename = os.path.splitext(os.path.basename(file_path))[0] + ".mp4"
             else:
                 print("❌ 文件不存在或未选择文件，退出。")
                 return
@@ -137,8 +140,16 @@ def main():
 
     video_clips = []
     for num in key_sequence:
-        name = f"{num}.mp4"
-        alt_name = f"{-num}.mp4"
+        if num == 0:
+            video_clips.append(video_cache[f"0.mp4"])
+            continue  # 跳过空音（或插入静音片段）
+        
+        sign = -1 if num < 0 else 1
+        mapped_num = sign * ((abs(num) - 1) % 7 + 1)  # 映射到 1~7 或 -1~-7
+        
+        name = f"{mapped_num}.mp4"
+        alt_name = f"{-mapped_num}.mp4"
+
         if name in video_cache:
             video_clips.append(video_cache[name])
         elif alt_name in video_cache:
@@ -150,7 +161,9 @@ def main():
         try:
             print("正在合成最终视频...")
             final_video = concatenate_videoclips(video_clips)
-            output_path = "output.mp4"
+            output_dir = "./output"
+            os.makedirs(output_dir, exist_ok=True)  # 确保输出目录存在
+            output_path = os.path.join(output_dir, output_filename)
             final_video.write_videofile(output_path, codec="libx264")
             print(f"✅ 合成成功，保存到：{output_path}")
         finally:
